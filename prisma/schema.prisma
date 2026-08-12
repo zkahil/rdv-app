@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  VENDEUR
+}
+
+enum AppointmentStatus {
+  EN_ATTENTE
+  CONFIRME
+  ANNULE
+}
+
+model User {
+  id            String   @id @default(cuid())
+  nom           String
+  email         String   @unique
+  password      String
+  role          Role     @default(VENDEUR)
+  slug          String?  @unique // page publique du vendeur, ex: karim-coiffure
+  actif         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdById   String?
+  createdBy     User?    @relation("CreatedAccounts", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers  User[]   @relation("CreatedAccounts")
+
+  products      Product[]
+  availabilities Availability[]
+  appointments  Appointment[]   @relation("VendeurAppointments")
+
+  @@index([role])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  nom         String
+  description String?
+  prix        Decimal  @db.Decimal(10, 2)
+  duree       Int      // en minutes
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendeurId   String
+  vendeur     User     @relation(fields: [vendeurId], references: [id], onDelete: Cascade)
+
+  appointments Appointment[]
+
+  @@index([vendeurId])
+}
+
+model Availability {
+  id         String   @id @default(cuid())
+  jourSemaine Int     // 0 = dimanche ... 6 = samedi
+  heureDebut String   // "09:00"
+  heureFin   String   // "18:00"
+
+  vendeurId  String
+  vendeur    User     @relation(fields: [vendeurId], references: [id], onDelete: Cascade)
+
+  @@index([vendeurId])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  date           DateTime          // date + heure du rendez-vous
+  statut         AppointmentStatus @default(EN_ATTENTE)
+
+  clientNom      String
+  clientTelephone String
+  clientEmail    String?
+  note           String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  vendeurId      String
+  vendeur        User     @relation("VendeurAppointments", fields: [vendeurId], references: [id], onDelete: Cascade)
+
+  @@index([vendeurId, date])
+  @@index([productId])
+}
