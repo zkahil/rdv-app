@@ -10,8 +10,8 @@ export default function AdminSidebar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: "Tableau de bord", href: "/admin/dashboard" },
-    { name: "Vendeurs", href: "/admin/vendeurs" },
+    { name: "Tableau de bord", href: "/dashboard" },
+    { name: "Vendeurs", href: "/vendeurs" },
   ];
 
   const isActive = (path: string) => pathname === path || pathname?.startsWith(path + "/");

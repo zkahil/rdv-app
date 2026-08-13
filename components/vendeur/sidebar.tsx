@@ -11,9 +11,9 @@ export default function VendeurSidebar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: "Mes produits", href: "/vendeur/produits" },
-    { name: "Disponibilités", href: "/vendeur/disponibilites" },
-    { name: "Rendez-vous", href: "/vendeur/rendez-vous" },
+    { name: "Mes produits", href: "/produits" },
+    { name: "Disponibilités", href: "/disponibilites" },
+    { name: "Rendez-vous", href: "/rendez-vous" },
   ];
 
   const isActive = (path: string) => pathname === path || pathname?.startsWith(path + "/");
