@@ -1,73 +1,60 @@
-import { listMyProducts, createProduct, toggleProductActif, deleteProduct } from './actions';
-
-export const dynamic = 'force-dynamic';
+import { getVendeurProducts, deleteProduct } from '@/app/actions/vendeur';
+import Button from '@/components/ui/button';
+import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Badge from '@/components/ui/badge';
 
 export default async function ProduitsPage() {
-  const produits = await listMyProducts();
-
-  async function handleCreate(formData: FormData) {
-    'use server';
-    await createProduct(formData);
-  }
-
-  async function handleToggle(formData: FormData) {
-    'use server';
-    await toggleProductActif(formData.get('id') as string);
-  }
-
-  async function handleDelete(formData: FormData) {
-    'use server';
-    await deleteProduct(formData.get('id') as string);
-  }
+  const produits = await getVendeurProducts();
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Mes produits / services</h1>
-
-      <form action={handleCreate} className="mb-8 rounded-lg border bg-white p-6 shadow-sm">
-        <h2 className="mb-4 font-medium">Ajouter un produit (ex: Coupe homme, Massage...)</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <input name="nom" placeholder="Nom du produit" required className="rounded border px-3 py-2 text-sm" />
-          <input name="prix" type="number" step="0.01" placeholder="Prix (MAD)" required className="rounded border px-3 py-2 text-sm" />
-          <input name="duree" type="number" placeholder="Durée (minutes)" required className="rounded border px-3 py-2 text-sm" />
-          <input name="description" placeholder="Description (optionnel)" className="rounded border px-3 py-2 text-sm" />
-        </div>
-        <button type="submit" className="mt-4 rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          Ajouter le produit
-        </button>
-      </form>
-
-      <div className="grid grid-cols-2 gap-4">
-        {produits.map((p) => (
-          <div key={p.id} className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-medium">{p.nom}</h3>
-                <p className="text-sm text-gray-500">{p.description}</p>
-                <p className="mt-2 text-sm">
-                  {Number(p.prix).toFixed(2)} MAD — {p.duree} min
-                </p>
-              </div>
-              <span className={p.actif ? 'text-xs text-green-600' : 'text-xs text-red-600'}>
-                {p.actif ? 'Actif' : 'Désactivé'}
-              </span>
-            </div>
-            <div className="mt-3 flex gap-3">
-              <form action={handleToggle}>
-                <input type="hidden" name="id" value={p.id} />
-                <button className="text-xs text-brand-600 hover:underline">
-                  {p.actif ? 'Désactiver' : 'Activer'}
-                </button>
-              </form>
-              <form action={handleDelete}>
-                <input type="hidden" name="id" value={p.id} />
-                <button className="text-xs text-red-600 hover:underline">Supprimer</button>
-              </form>
-            </div>
-          </div>
-        ))}
-        {produits.length === 0 && <p className="text-gray-400">Aucun produit pour le moment</p>}
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-bold">Mes produits</h1>
+        <Button variant="primary">+ Ajouter un produit</Button>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {produits.map((produit) => (
+          <Card key={produit.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <CardTitle className="text-lg">{produit.nom}</CardTitle>
+                <Badge variant={produit.actif ? "success" : "danger"}>
+                  {produit.actif ? "Actif" : "Inactif"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 text-sm mb-4">{produit.description || 'Aucune description'}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-2xl font-bold text-brand-600">
+                    {produit.prix}€
+                  </span>
+                  <p className="text-xs text-gray-500">{produit.duree} minutes</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm">Modifier</Button>
+                  <form action={deleteProduct.bind(null, produit.id)}>
+                    <Button variant="danger" size="sm" type="submit">Supprimer</Button>
+                  </form>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {produits.length === 0 && (
+        <Card>
+          <div className="text-center py-12">
+            <p className="text-gray-500">Aucun produit pour le moment</p>
+            <Button variant="primary" className="mt-4">
+              Ajouter votre premier produit
+            </Button>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

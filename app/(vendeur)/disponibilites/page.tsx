@@ -1,50 +1,70 @@
-import { listMyAvailabilities, createAvailability, deleteAvailability, JOURS } from './actions';
+import { getVendeurAvailabilities, deleteAvailability } from '@/app/actions/vendeur';
+import Button from '@/components/ui/button';
+import Card from '@/components/ui/card';
+import Badge from '@/components/ui/badge';
 
-export const dynamic = 'force-dynamic';
+const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
 export default async function DisponibilitesPage() {
-  const disponibilites = await listMyAvailabilities();
+  const availabilities = await getVendeurAvailabilities();
 
-  async function handleCreate(formData: FormData) {
-    'use server';
-    await createAvailability(formData);
-  }
+  // Grouper par jour
+  const groupedAvailabilities = availabilities.reduce((acc, avail) => {
+    const jour = avail.jourSemaine;
+    if (!acc[jour]) acc[jour] = [];
+    acc[jour].push(avail);
+    return acc;
+  }, {} as Record<number, typeof availabilities>);
 
-  async function handleDelete(formData: FormData) {
-    'use server';
-    await deleteAvailability(formData.get('id') as string);
-  }
+  const jours = Object.keys(groupedAvailabilities).map(Number).sort();
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Mes disponibilités</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-bold">Mes disponibilités</h1>
+        <Button variant="primary">+ Ajouter une disponibilité</Button>
+      </div>
 
-      <form action={handleCreate} className="mb-8 rounded-lg border bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-3 gap-4">
-          <select name="jourSemaine" className="rounded border px-3 py-2 text-sm">
-            {JOURS.map((j, i) => (
-              <option key={i} value={i}>{j}</option>
-            ))}
-          </select>
-          <input name="heureDebut" type="time" required className="rounded border px-3 py-2 text-sm" />
-          <input name="heureFin" type="time" required className="rounded border px-3 py-2 text-sm" />
-        </div>
-        <button type="submit" className="mt-4 rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          Ajouter le créneau
-        </button>
-      </form>
-
-      <div className="space-y-2">
-        {disponibilites.map((d) => (
-          <div key={d.id} className="flex items-center justify-between rounded border bg-white p-3 text-sm">
-            <span>{JOURS[d.jourSemaine]} : {d.heureDebut} - {d.heureFin}</span>
-            <form action={handleDelete}>
-              <input type="hidden" name="id" value={d.id} />
-              <button className="text-xs text-red-600 hover:underline">Supprimer</button>
-            </form>
-          </div>
-        ))}
-        {disponibilites.length === 0 && <p className="text-gray-400">Aucune disponibilité définie</p>}
+      <div className="space-y-4">
+        {jours.length === 0 ? (
+          <Card>
+            <div className="text-center py-12">
+              <p className="text-gray-500">Aucune disponibilité définie</p>
+              <Button variant="primary" className="mt-4">
+                Ajouter une disponibilité
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          jours.map((jour) => (
+            <Card key={jour}>
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg">
+                  {JOURS[jour]}
+                </h3>
+                <div className="space-y-2">
+                  {groupedAvailabilities[jour].map((avail) => (
+                    <div
+                      key={avail.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {avail.heureDebut} - {avail.heureFin}
+                        </p>
+                      </div>
+                      <form action={deleteAvailability.bind(null, avail.id)}>
+                        <Button variant="danger" size="sm" type="submit">
+                          Supprimer
+                        </Button>
+                      </form>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

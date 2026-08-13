@@ -1,124 +1,405 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { getAvailableSlots, createPublicAppointment } from './actions';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  Calendar, Clock, User, Mail, Phone, MessageSquare, 
+  CheckCircle, AlertCircle, Loader2, ChevronDown 
+} from 'lucide-react';
+import Button from '@/components/ui/button';
+import Input from '@/components/ui/input';
+import Card from '@/components/ui/card';
 
-export default function ReservationForm({
-  vendeurId,
-  productId,
-}: {
+interface Availability {
+  id: string;
+  jourSemaine: number;
+  heureDebut: string;
+  heureFin: string;
+}
+
+interface ReservationFormProps {
   vendeurId: string;
   productId: string;
-}) {
-  const [date, setDate] = useState('');
-  const [slots, setSlots] = useState<string[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState('');
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [isPending, startTransition] = useTransition();
+  vendeurNom: string;
+  productNom: string;
+  availabilities: Availability[];
+  groupedAvailabilities: Record<number, Availability[]>;
+}
 
-  async function handleDateChange(value: string) {
-    setDate(value);
-    setSelectedSlot('');
-    setSlots([]);
-    if (!value) return;
+const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
-    startTransition(async () => {
-      const available = await getAvailableSlots(vendeurId, productId, value);
-      setSlots(available);
+export default function ReservationForm({ 
+  vendeurId, 
+  productId,
+  vendeurNom,
+  productNom,
+  availabilities,
+  groupedAvailabilities
+}: ReservationFormProps) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedHour, setSelectedHour] = useState<string>('');
+
+  // États pour les champs
+  const [formData, setFormData] = useState({
+    clientNom: '',
+    clientEmail: '',
+    clientTelephone: '',
+    date: '',
+    heure: '',
+    note: '',
+  });
+
+  // Générer les dates disponibles (prochains 14 jours)
+  const getAvailableDates = () => {
+    const dates = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 14; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + i);
+      const jourSemaine = date.getDay();
+      
+      // Vérifier si le vendeur est disponible ce jour
+      if (groupedAvailabilities[jourSemaine]) {
+        dates.push({
+          date: date,
+          jourSemaine: jourSemaine,
+          dateStr: date.toISOString().split('T')[0],
+          display: `${date.getDate()} ${MOIS[date.getMonth()]} ${date.getFullYear()}`,
+          dayName: JOURS[jourSemaine],
+        });
+      }
+    }
+    return dates;
+  };
+
+  // Générer les heures disponibles pour une date sélectionnée
+  const getAvailableHours = (dateStr: string) => {
+    if (!dateStr) return [];
+    
+    const date = new Date(dateStr);
+    const jourSemaine = date.getDay();
+    const dayAvailabilities = groupedAvailabilities[jourSemaine] || [];
+    
+    const hours = [];
+    for (const avail of dayAvailabilities) {
+      const startHour = parseInt(avail.heureDebut.split(':')[0]);
+      const endHour = parseInt(avail.heureFin.split(':')[0]);
+      
+      for (let h = startHour; h < endHour; h++) {
+        const hourStr = `${String(h).padStart(2, '0')}:00`;
+        hours.push(hourStr);
+        // Ajouter aussi les 30 minutes
+        const halfHourStr = `${String(h).padStart(2, '0')}:30`;
+        hours.push(halfHourStr);
+      }
+    }
+    return hours.sort();
+  };
+
+  const availableDates = getAvailableDates();
+  const availableHours = getAvailableHours(selectedDate);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
     });
-  }
+    if (error) setError(null);
 
-  async function handleSubmit(formData: FormData) {
-    formData.set('vendeurId', vendeurId);
-    formData.set('productId', productId);
-    formData.set('date', date);
-    formData.set('heure', selectedSlot);
+    // Si la date change, mettre à jour les heures disponibles
+    if (name === 'date') {
+      setSelectedDate(value);
+      setFormData(prev => ({ ...prev, heure: '' }));
+      setSelectedHour('');
+    }
+    
+    if (name === 'heure') {
+      setSelectedHour(value);
+    }
+  };
 
-    const res = await createPublicAppointment(formData);
-    setResult(res);
-  }
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+    // Vérifier que la date et l'heure sont sélectionnées
+    if (!formData.date || !formData.heure) {
+      setError('Veuillez sélectionner une date et une heure');
+      setLoading(false);
+      return;
+    }
 
-  if (result?.success) {
+    try {
+      const formDataObj = new FormData();
+      formDataObj.append('vendeurId', vendeurId);
+      formDataObj.append('productId', productId);
+      formDataObj.append('clientNom', formData.clientNom);
+      formDataObj.append('clientEmail', formData.clientEmail);
+      formDataObj.append('clientTelephone', formData.clientTelephone);
+      formDataObj.append('date', formData.date);
+      formDataObj.append('heure', formData.heure);
+      formDataObj.append('note', formData.note);
+      formDataObj.append('vendeurSlug', window.location.pathname.split('/')[1]);
+
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        body: formDataObj,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Une erreur est survenue');
+      }
+
+      setSuccess(true);
+      // Rediriger après 3 secondes
+      setTimeout(() => {
+        router.push(`/${window.location.pathname.split('/')[1]}`);
+      }, 3000);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-green-700">
-        {result.message}
+      <div className="text-center py-8">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+          <CheckCircle className="h-8 w-8 text-green-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900">
+          Réservation confirmée !
+        </h3>
+        <p className="mt-2 text-gray-600">
+          Votre rendez-vous pour <strong>{productNom}</strong> a été envoyé à {vendeurNom}.
+        </p>
+        <p className="mt-1 text-sm text-gray-500">
+          Vous recevrez une confirmation par email dans les plus brefs délais.
+        </p>
+        <Button 
+          variant="primary" 
+          className="mt-6"
+          onClick={() => router.push(`/${window.location.pathname.split('/')[1]}`)}
+        >
+          Retour à l'accueil
+        </Button>
       </div>
     );
   }
 
   return (
-    <form action={handleSubmit} className="space-y-4">
-      <div>
-        <label className="mb-1 block text-sm font-medium">Date souhaitée</label>
-        <input
-          type="date"
-          min={todayStr}
-          value={date}
-          onChange={(e) => handleDateChange(e.target.value)}
-          required
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </div>
-
-      {date && (
-        <div>
-          <label className="mb-1 block text-sm font-medium">Créneau disponible</label>
-          {isPending && <p className="text-sm text-gray-400">Chargement des créneaux...</p>}
-          {!isPending && slots.length === 0 && (
-            <p className="text-sm text-gray-400">Aucun créneau disponible ce jour-là</p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {slots.map((s) => (
-              <button
-                type="button"
-                key={s}
-                onClick={() => setSelectedSlot(s)}
-                className={`rounded border px-3 py-1.5 text-sm ${
-                  selectedSlot === s
-                    ? 'border-brand-600 bg-brand-600 text-white'
-                    : 'hover:border-brand-500'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {error && (
+        <div className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      {selectedSlot && (
-        <>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Nom complet</label>
-            <input name="clientNom" required className="w-full rounded border px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Téléphone</label>
-            <input name="clientTelephone" required className="w-full rounded border px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Email (optionnel)</label>
-            <input name="clientEmail" type="email" className="w-full rounded border px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Note (optionnel)</label>
-            <textarea name="note" className="w-full rounded border px-3 py-2 text-sm" rows={2} />
+      {/* Informations personnelles */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-gray-700">Vos informations</h3>
+        
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="relative">
+            <Input
+              label="Nom complet"
+              name="clientNom"
+              placeholder="Jean Dupont"
+              value={formData.clientNom}
+              onChange={handleChange}
+              required
+              className="pl-9"
+            />
+            <User className="absolute bottom-3 left-3 h-4 w-4 text-gray-400" />
           </div>
 
-          {result && !result.success && (
-            <p className="rounded bg-red-50 p-2 text-sm text-red-600">{result.message}</p>
+          <div className="relative">
+            <Input
+              label="Email"
+              name="clientEmail"
+              type="email"
+              placeholder="jean@example.com"
+              value={formData.clientEmail}
+              onChange={handleChange}
+              className="pl-9"
+            />
+            <Mail className="absolute bottom-3 left-3 h-4 w-4 text-gray-400" />
+          </div>
+        </div>
+
+        <div className="relative">
+          <Input
+            label="Téléphone"
+            name="clientTelephone"
+            type="tel"
+            placeholder="06 12 34 56 78"
+            value={formData.clientTelephone}
+            onChange={handleChange}
+            required
+            className="pl-9"
+          />
+          <Phone className="absolute bottom-3 left-3 h-4 w-4 text-gray-400" />
+        </div>
+      </div>
+
+      {/* Sélection de la date et heure */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-gray-700">Choisissez votre créneau</h3>
+        
+        {availabilities.length === 0 ? (
+          <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+            <AlertCircle className="mb-1 inline h-4 w-4" />
+            <span> Ce vendeur n'a pas encore défini ses disponibilités.</span>
+          </div>
+        ) : (
+          <>
+            {/* Sélection de la date */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Date
+              </label>
+              <select
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+                required
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none"
+              >
+                <option value="">Sélectionnez une date</option>
+                {availableDates.map(({ dateStr, display, dayName }) => (
+                  <option key={dateStr} value={dateStr}>
+                    {dayName} - {display}
+                  </option>
+                ))}
+              </select>
+              <Calendar className="absolute bottom-3 left-3 h-4 w-4 text-gray-400" />
+              <ChevronDown className="absolute bottom-3 right-3 h-4 w-4 text-gray-400" />
+            </div>
+
+            {/* Sélection de l'heure */}
+            {selectedDate && (
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Heure
+                </label>
+                <select
+                  name="heure"
+                  value={formData.heure}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none"
+                >
+                  <option value="">Sélectionnez une heure</option>
+                  {availableHours.map((hour) => (
+                    <option key={hour} value={hour}>
+                      {hour}
+                    </option>
+                  ))}
+                </select>
+                <Clock className="absolute bottom-3 left-3 h-4 w-4 text-gray-400" />
+                <ChevronDown className="absolute bottom-3 right-3 h-4 w-4 text-gray-400" />
+              </div>
+            )}
+
+            {selectedDate && availableHours.length === 0 && (
+              <p className="text-sm text-yellow-600">
+                ⚠️ Aucun créneau disponible pour cette date
+              </p>
+            )}
+
+            {/* Afficher les disponibilités par jour */}
+            <div className="mt-2 rounded-lg bg-gray-50 p-3">
+              <p className="text-xs font-medium text-gray-600">Disponibilités habituelles :</p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {Object.entries(groupedAvailabilities).map(([jour, dispos]) => (
+                  <span key={jour} className="text-xs bg-white px-2 py-1 rounded border border-gray-200">
+                    {JOURS[Number(jour)]}: {dispos.map(d => `${d.heureDebut}-${d.heureFin}`).join(', ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Note optionnelle */}
+      <div className="relative">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          Note (optionnel)
+        </label>
+        <textarea
+          name="note"
+          rows={3}
+          placeholder="Informations complémentaires..."
+          value={formData.note}
+          onChange={handleChange}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+        <MessageSquare className="absolute bottom-3 left-3 h-4 w-4 text-gray-400" />
+      </div>
+
+      {/* Résumé */}
+      <div className="rounded-lg bg-gray-50 p-4">
+        <p className="text-sm font-medium text-gray-700">Résumé de la réservation</p>
+        <div className="mt-2 space-y-1 text-sm text-gray-600">
+          <p>Service : <span className="font-medium">{productNom}</span></p>
+          <p>Chez : <span className="font-medium">{vendeurNom}</span></p>
+          {formData.date && (
+            <p>
+              Le :{' '}
+              <span className="font-medium">
+                {new Date(formData.date).toLocaleDateString('fr-FR', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </span>
+            </p>
           )}
+          {formData.heure && (
+            <p>
+              À : <span className="font-medium">{formData.heure}</span>
+            </p>
+          )}
+        </div>
+      </div>
 
-          <button
-            type="submit"
-            className="w-full rounded bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700"
-          >
-            Confirmer la réservation
-          </button>
-        </>
-      )}
+      <Button
+        type="submit"
+        variant="primary"
+        fullWidth
+        disabled={loading || availabilities.length === 0}
+        className="py-3 text-base"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Envoi en cours...
+          </>
+        ) : (
+          'Confirmer la réservation'
+        )}
+      </Button>
+
+      <p className="text-center text-xs text-gray-500">
+        En cliquant sur "Confirmer", vous acceptez les conditions générales.
+        <br />
+        Vous recevrez un email de confirmation.
+      </p>
     </form>
   );
 }

@@ -1,66 +1,99 @@
-import { NextAuthOptions, getServerSession } from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
-import { db } from '@/lib/db';
+import { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { prisma } from "./prisma";
+import bcrypt from "bcryptjs";
+
+declare module "next-auth" {
+  interface User {
+    role: string;
+    slug?: string;
+  }
+  interface Session {
+    user: User & {
+      role: string;
+      slug?: string;
+    };
+  }
+}
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/login' },
   providers: [
     CredentialsProvider({
-      name: 'Identifiants',
+      name: "credentials",
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Mot de passe', type: 'password' },
+        email: { label: "Email", type: "email" },
+        password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        console.log("🔐 Tentative de connexion:", credentials?.email);
 
-        const user = await db.user.findUnique({ where: { email: credentials.email } });
-        if (!user || !user.actif) return null;
+        if (!credentials?.email || !credentials?.password) {
+          console.log("❌ Email ou mot de passe manquant");
+          return null;
+        }
 
-        const valid = await bcrypt.compare(credentials.password, user.password);
-        if (!valid) return null;
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
+
+        console.log("👤 Utilisateur trouvé:", user ? user.email : "non trouvé");
+        console.log("📋 Rôle:", user?.role);
+
+        if (!user || !user.password) {
+          console.log("❌ Utilisateur non trouvé ou pas de mot de passe");
+          return null;
+        }
+
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        console.log("🔑 Mot de passe valide:", isValid);
+
+        if (!isValid) {
+          return null;
+        }
+
+        console.log("✅ Authentification réussie pour:", user.email);
 
         return {
           id: user.id,
           email: user.email,
-          name: user.nom,
+          name: user.name,
           role: user.role,
           slug: user.slug,
-        } as any;
+        };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
+      console.log("📝 JWT Callback - User:", user);
       if (user) {
-        token.role = (user as any).role;
-        token.id = (user as any).id;
-        token.slug = (user as any).slug;
+        token.role = user.role;
+        token.slug = user.slug;
+        token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
+      console.log("📝 Session Callback - Token:", token);
       if (session.user) {
-        (session.user as any).role = token.role;
-        (session.user as any).id = token.id;
-        (session.user as any).slug = token.slug;
+        session.user.role = token.role as string;
+        session.user.slug = token.slug as string;
+        session.user.id = token.id as string;
       }
+      console.log("📝 Session Callback - Session:", session);
       return session;
     },
+  },
+  pages: {
+    signIn: "/login",
+  },
+  session: {
+    strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export function getSession() {
+export async function getSession() {
+  const { getServerSession } = await import("next-auth");
   return getServerSession(authOptions);
-}
-
-export async function requireRole(role: 'ADMIN' | 'VENDEUR') {
-  const session = await getSession();
-  if (!session || (session.user as any).role !== role) {
-    throw new Error('UNAUTHORIZED');
-  }
-  return session;
 }

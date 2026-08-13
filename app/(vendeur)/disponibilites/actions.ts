@@ -7,8 +7,7 @@ import { availabilitySchema } from '@/lib/validations';
 
 export type ActionResult = { success: boolean; message: string };
 
-const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-export { JOURS };
+
 
 export async function createAvailability(formData: FormData): Promise<ActionResult> {
   const session = await requireRole('VENDEUR').catch(() => null);

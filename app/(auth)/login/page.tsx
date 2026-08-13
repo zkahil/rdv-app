@@ -1,71 +1,105 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Button from "@/components/ui/button";
+import Input from "@/components/ui/input";
+import Card from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
-    setError('');
 
-    const res = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    });
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
 
-    setLoading(false);
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (res?.error) {
-      setError('Identifiants invalides');
-      return;
+      if (result?.error) {
+        setError("Email ou mot de passe incorrect");
+        setLoading(false);
+        return;
+      }
+
+      // Attendre que la session soit mise à jour
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Récupérer la session pour connaître le rôle
+      const sessionRes = await fetch("/api/auth/session");
+      const sessionData = await sessionRes.json();
+
+      if (sessionData?.user) {
+        const role = sessionData.user.role?.toUpperCase();
+        console.log("👤 Rôle de l'utilisateur:", role);
+
+        if (role === "ADMIN") {
+          router.push("/dashboard");
+        } else if (role === "VENDEUR") {
+          router.push("/produits");
+        } else {
+          router.push("/");
+        }
+      } else {
+        setError("Impossible de récupérer la session");
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error("❌ Erreur:", error);
+      setError("Une erreur est survenue");
+      setLoading(false);
     }
-
-    router.push('/dashboard');
-    router.refresh();
-  }
+  };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border bg-white p-8 shadow-sm">
-        <h1 className="mb-6 text-xl font-semibold">Connexion</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <Card className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">RDV App</h1>
+          <p className="text-gray-600 mt-2">Connectez-vous à votre espace</p>
+        </div>
 
-        {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Email"
+            name="email"
+            type="email"
+            placeholder="admin@rdvapp.com"
+            defaultValue="admin@rdvapp.com"
+            required
+          />
+          <Input
+            label="Mot de passe"
+            name="password"
+            type="password"
+            placeholder="admin123"
+            defaultValue="admin123"
+            required
+          />
 
-        <label className="mb-1 block text-sm font-medium">Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="mb-4 w-full rounded border px-3 py-2 text-sm"
-        />
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+              {error}
+            </div>
+          )}
 
-        <label className="mb-1 block text-sm font-medium">Mot de passe</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="mb-6 w-full rounded border px-3 py-2 text-sm"
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-        >
-          {loading ? 'Connexion...' : 'Se connecter'}
-        </button>
-      </form>
+          <Button type="submit" variant="primary" fullWidth disabled={loading}>
+            {loading ? "Connexion..." : "Se connecter"}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

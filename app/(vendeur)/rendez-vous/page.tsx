@@ -1,75 +1,111 @@
-import { listMyAppointments, updateAppointmentStatus } from './actions';
-
-export const dynamic = 'force-dynamic';
-
-const STATUT_COLORS: Record<string, string> = {
-  EN_ATTENTE: 'text-yellow-600',
-  CONFIRME: 'text-green-600',
-  ANNULE: 'text-red-600',
-};
+import { getVendeurAppointments, updateAppointmentStatus } from '@/app/actions/vendeur';
+import Card from '@/components/ui/card';
+import Badge from '@/components/ui/badge';
+import Button from '@/components/ui/button';
 
 export default async function RendezVousPage() {
-  const rdvs = await listMyAppointments();
+  const appointments = await getVendeurAppointments();
 
-  async function handleConfirm(formData: FormData) {
-    'use server';
-    await updateAppointmentStatus(formData.get('id') as string, 'CONFIRME');
-  }
+  const getBadgeVariant = (statut: string) => {
+    switch (statut) {
+      case 'CONFIRME': return 'success' as const;
+      case 'EN_ATTENTE': return 'warning' as const;
+      case 'ANNULE': return 'danger' as const;
+      default: return 'default' as const;
+    }
+  };
 
-  async function handleCancel(formData: FormData) {
-    'use server';
-    await updateAppointmentStatus(formData.get('id') as string, 'ANNULE');
-  }
+  const getStatutLabel = (statut: string) => {
+    switch (statut) {
+      case 'CONFIRME': return 'Confirmé';
+      case 'EN_ATTENTE': return 'En attente';
+      case 'ANNULE': return 'Annulé';
+      default: return statut;
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-4xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">Mes rendez-vous</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-bold">Mes rendez-vous</h1>
+        <div className="flex gap-2">
+          <Button variant="secondary">Aujourd'hui</Button>
+          <Button variant="secondary">Cette semaine</Button>
+          <Button variant="primary">Voir tout</Button>
+        </div>
+      </div>
 
-      <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-gray-50 text-left">
-              <th className="p-3">Date</th>
-              <th className="p-3">Produit</th>
-              <th className="p-3">Client</th>
-              <th className="p-3">Téléphone</th>
-              <th className="p-3">Statut</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rdvs.map((r) => (
-              <tr key={r.id} className="border-b last:border-0">
-                <td className="p-3">{new Date(r.date).toLocaleString('fr-FR')}</td>
-                <td className="p-3">{r.product.nom}</td>
-                <td className="p-3">{r.clientNom}</td>
-                <td className="p-3">{r.clientTelephone}</td>
-                <td className={`p-3 font-medium ${STATUT_COLORS[r.statut]}`}>{r.statut}</td>
-                <td className="flex gap-2 p-3">
-                  {r.statut === 'EN_ATTENTE' && (
-                    <>
-                      <form action={handleConfirm}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <button className="text-xs text-green-600 hover:underline">Confirmer</button>
+      <div className="space-y-4">
+        {appointments.length === 0 ? (
+          <Card>
+            <div className="text-center py-12">
+              <p className="text-gray-500">Aucun rendez-vous pour le moment</p>
+            </div>
+          </Card>
+        ) : (
+          appointments.map((rdv) => (
+            <Card key={rdv.id} className="hover:shadow-md transition-shadow">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-semibold">
+                      {rdv.clientNom.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{rdv.clientNom}</h3>
+                      <p className="text-sm text-gray-500">
+                        {rdv.product?.nom || 'Service non spécifié'}
+                      </p>
+                      <p className="text-xs text-gray-400">{rdv.clientEmail}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="text-sm">
+                    <p className="font-medium">
+                      {rdv.date.toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+                    <p className="text-gray-500">
+                      {rdv.date.toLocaleTimeString('fr-FR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                  <Badge variant={getBadgeVariant(rdv.statut)}>
+                    {getStatutLabel(rdv.statut)}
+                  </Badge>
+                  {rdv.statut === 'EN_ATTENTE' && (
+                    <div className="flex gap-2">
+                      <form action={updateAppointmentStatus.bind(null, rdv.id, 'CONFIRME')}>
+                        <Button variant="success" size="sm" type="submit">
+                          Confirmer
+                        </Button>
                       </form>
-                      <form action={handleCancel}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <button className="text-xs text-red-600 hover:underline">Annuler</button>
+                      <form action={updateAppointmentStatus.bind(null, rdv.id, 'ANNULE')}>
+                        <Button variant="danger" size="sm" type="submit">
+                          Annuler
+                        </Button>
                       </form>
-                    </>
+                    </div>
                   )}
-                </td>
-              </tr>
-            ))}
-            {rdvs.length === 0 && (
-              <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-400">
-                  Aucun rendez-vous pour le moment
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  {rdv.statut === 'CONFIRME' && (
+                    <form action={updateAppointmentStatus.bind(null, rdv.id, 'ANNULE')}>
+                      <Button variant="danger" size="sm" type="submit">
+                        Annuler
+                      </Button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
