@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+build/
+*.config.js
+*.config.ts
+next-env.d.ts
+prisma/
+scripts/
+public/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
