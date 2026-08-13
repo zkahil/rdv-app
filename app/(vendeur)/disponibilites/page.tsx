@@ -1,14 +1,13 @@
 import { getVendeurAvailabilities, deleteAvailability } from '@/app/actions/vendeur';
 import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
-import Badge from '@/components/ui/badge';
+// Supprimer l'import de Badge qui n'est pas utilisé
 
 const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
 export default async function DisponibilitesPage() {
   const availabilities = await getVendeurAvailabilities();
 
-  // Grouper par jour
   const groupedAvailabilities = availabilities.reduce((acc, avail) => {
     const jour = avail.jourSemaine;
     if (!acc[jour]) acc[jour] = [];

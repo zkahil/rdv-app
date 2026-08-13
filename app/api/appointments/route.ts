@@ -13,7 +13,6 @@ export async function POST(request: NextRequest) {
     const dateStr = formData.get('date') as string;
     const heure = formData.get('heure') as string;
     const note = formData.get('note') as string;
-    const vendeurSlug = formData.get('vendeurSlug') as string;
 
     // Validation
     if (!vendeurId || !productId || !clientNom || !clientTelephone || !dateStr || !heure) {
@@ -23,28 +22,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Combiner date et heure
     const dateTime = new Date(`${dateStr}T${heure}:00`);
 
-    // Vérifier la disponibilité du vendeur pour ce jour et cette heure
-    const jourSemaine = dateTime.getDay();
-    const availability = await db.availability.findFirst({
-      where: {
-        vendeurId,
-        jourSemaine,
-        heureDebut: { lte: heure },
-        heureFin: { gt: heure },
-      },
-    });
-
-    if (!availability) {
-      return NextResponse.json(
-        { error: 'Ce créneau n\'est pas disponible' },
-        { status: 409 }
-      );
-    }
-
-    // Vérifier que le créneau n'est pas déjà réservé
     const existingAppointment = await db.appointment.findFirst({
       where: {
         vendeurId,
@@ -60,7 +39,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Créer le rendez-vous
     const appointment = await db.appointment.create({
       data: {
         vendeurId,
@@ -73,9 +51,6 @@ export async function POST(request: NextRequest) {
         statut: 'EN_ATTENTE',
       },
     });
-
-    // Ici vous pouvez envoyer un email de confirmation
-    // await sendConfirmationEmail(clientEmail, clientNom, appointment);
 
     return NextResponse.json({
       success: true,

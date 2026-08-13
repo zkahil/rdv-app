@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 import Input from '@/components/ui/input';
-import Card from '@/components/ui/card';
 
 interface Availability {
   id: string;
@@ -42,9 +41,7 @@ export default function ReservationForm({
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedHour, setSelectedHour] = useState<string>('');
 
-  // États pour les champs
   const [formData, setFormData] = useState({
     clientNom: '',
     clientEmail: '',
@@ -54,7 +51,6 @@ export default function ReservationForm({
     note: '',
   });
 
-  // Générer les dates disponibles (prochains 14 jours)
   const getAvailableDates = () => {
     const dates = [];
     const today = new Date();
@@ -64,7 +60,6 @@ export default function ReservationForm({
       date.setDate(date.getDate() + i);
       const jourSemaine = date.getDay();
       
-      // Vérifier si le vendeur est disponible ce jour
       if (groupedAvailabilities[jourSemaine]) {
         dates.push({
           date: date,
@@ -78,7 +73,6 @@ export default function ReservationForm({
     return dates;
   };
 
-  // Générer les heures disponibles pour une date sélectionnée
   const getAvailableHours = (dateStr: string) => {
     if (!dateStr) return [];
     
@@ -94,7 +88,6 @@ export default function ReservationForm({
       for (let h = startHour; h < endHour; h++) {
         const hourStr = `${String(h).padStart(2, '0')}:00`;
         hours.push(hourStr);
-        // Ajouter aussi les 30 minutes
         const halfHourStr = `${String(h).padStart(2, '0')}:30`;
         hours.push(halfHourStr);
       }
@@ -113,15 +106,9 @@ export default function ReservationForm({
     });
     if (error) setError(null);
 
-    // Si la date change, mettre à jour les heures disponibles
     if (name === 'date') {
       setSelectedDate(value);
       setFormData(prev => ({ ...prev, heure: '' }));
-      setSelectedHour('');
-    }
-    
-    if (name === 'heure') {
-      setSelectedHour(value);
     }
   };
 
@@ -130,7 +117,6 @@ export default function ReservationForm({
     setLoading(true);
     setError(null);
 
-    // Vérifier que la date et l'heure sont sélectionnées
     if (!formData.date || !formData.heure) {
       setError('Veuillez sélectionner une date et une heure');
       setLoading(false);
@@ -161,7 +147,6 @@ export default function ReservationForm({
       }
 
       setSuccess(true);
-      // Rediriger après 3 secondes
       setTimeout(() => {
         router.push(`/${window.location.pathname.split('/')[1]}`);
       }, 3000);
@@ -193,7 +178,7 @@ export default function ReservationForm({
           className="mt-6"
           onClick={() => router.push(`/${window.location.pathname.split('/')[1]}`)}
         >
-          Retour à l'accueil
+          Retour à l&apos;accueil
         </Button>
       </div>
     );
@@ -208,7 +193,6 @@ export default function ReservationForm({
         </div>
       )}
 
-      {/* Informations personnelles */}
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-gray-700">Vos informations</h3>
         
@@ -255,18 +239,16 @@ export default function ReservationForm({
         </div>
       </div>
 
-      {/* Sélection de la date et heure */}
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-gray-700">Choisissez votre créneau</h3>
         
         {availabilities.length === 0 ? (
           <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
             <AlertCircle className="mb-1 inline h-4 w-4" />
-            <span> Ce vendeur n'a pas encore défini ses disponibilités.</span>
+            <span> Ce vendeur n&apos;a pas encore défini ses disponibilités.</span>
           </div>
         ) : (
           <>
-            {/* Sélection de la date */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Date
@@ -289,7 +271,6 @@ export default function ReservationForm({
               <ChevronDown className="absolute bottom-3 right-3 h-4 w-4 text-gray-400" />
             </div>
 
-            {/* Sélection de l'heure */}
             {selectedDate && (
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -320,7 +301,6 @@ export default function ReservationForm({
               </p>
             )}
 
-            {/* Afficher les disponibilités par jour */}
             <div className="mt-2 rounded-lg bg-gray-50 p-3">
               <p className="text-xs font-medium text-gray-600">Disponibilités habituelles :</p>
               <div className="mt-1 flex flex-wrap gap-2">
@@ -335,7 +315,6 @@ export default function ReservationForm({
         )}
       </div>
 
-      {/* Note optionnelle */}
       <div className="relative">
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           Note (optionnel)
@@ -351,7 +330,6 @@ export default function ReservationForm({
         <MessageSquare className="absolute bottom-3 left-3 h-4 w-4 text-gray-400" />
       </div>
 
-      {/* Résumé */}
       <div className="rounded-lg bg-gray-50 p-4">
         <p className="text-sm font-medium text-gray-700">Résumé de la réservation</p>
         <div className="mt-2 space-y-1 text-sm text-gray-600">
@@ -396,7 +374,7 @@ export default function ReservationForm({
       </Button>
 
       <p className="text-center text-xs text-gray-500">
-        En cliquant sur "Confirmer", vous acceptez les conditions générales.
+        En cliquant sur &quot;Confirmer&quot;, vous acceptez les conditions générales.
         <br />
         Vous recevrez un email de confirmation.
       </p>

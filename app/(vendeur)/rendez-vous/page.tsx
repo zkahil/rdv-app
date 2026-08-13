@@ -29,7 +29,7 @@ export default async function RendezVousPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold">Mes rendez-vous</h1>
         <div className="flex gap-2">
-          <Button variant="secondary">Aujourd'hui</Button>
+          <Button variant="secondary">Aujourd&apos;hui</Button>
           <Button variant="secondary">Cette semaine</Button>
           <Button variant="primary">Voir tout</Button>
         </div>
